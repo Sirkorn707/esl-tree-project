@@ -31,7 +31,7 @@ węzły mogą być obliczane jednocześnie. Celem projektu jest:
 - uzyskanie wyników **identycznych** z modelem referencyjnym w Pythonie,
 - porównanie kolejnych wariantów architektury pod względem opóźnienia, przepustowości
   i zużycia zasobów (LUT, FF, BRAM, DSP),
-- weryfikacja na płytce z układem Zynq-7020 (PYNQ-Z2) i porównanie z implementacją
+- weryfikacja na płytce Digilent Zybo Z7 (Zynq-7000) i porównanie z implementacją
   programową na procesorze ARM.
 
 ## Model i dane
@@ -72,7 +72,7 @@ z scikit-learn. Zgodność z `predict` jest raportowana osobno (dla użytego mod
 flowchart LR
     A["Python<br/>trening, kwantyzacja,<br/>eksport model.h"] --> B["Vitis HLS<br/>C++ → RTL,<br/>csim / cosim"]
     B --> C["Vivado<br/>Zynq PS + IP<br/>(AXI4-Lite)"]
-    C --> D["PYNQ-Z2<br/>test i pomiar czasu"]
+    C --> D["Zybo Z7<br/>program bare-metal,<br/>test i pomiar czasu"]
 ```
 
 Wszystkie cechy próbki są przekazywane jako jedno spakowane słowo przez interfejs AXI4-Lite,
@@ -86,7 +86,8 @@ po jednej zmianie:
 | **v2** | `rf_v2_forest.cpp` | las 8 drzew w architekturze v1 liczonych równolegle + głosowanie | zasoby rosnące liniowo z liczbą drzew przy niemal niezmienionym opóźnieniu |
 | **v3** | `rf_v2_forest.cpp` + `gen/b8` | wariant v2 z cechami i progami 8-bitowymi zamiast 12-bitowych | mniejsze zużycie LUT przy zachowanej dokładności |
 
-Zegar docelowy: 100 MHz, układ `xc7z020clg400-1`.
+Zegar docelowy: 100 MHz, układ `xc7z020clg400-1` (Zybo Z7-20). Dla Zybo Z7-10 i starszego Zybo
+(`xc7z010clg400-1`) skrypty przyjmują inną część (patrz [Uruchomienie](#uruchomienie)).
 
 ## Wyniki
 
@@ -134,8 +135,8 @@ etapie projektu.
 │   └── run_csim.sh         symulacja C kompilatorem g++
 ├── vivado/
 │   └── build_bd.tcl        projekt blokowy Zynq + IP, bitstream
-├── pynq/
-│   └── dt_host.py          program hosta na płytce PYNQ
+├── zybo/
+│   └── dt_host.c           program hosta bare-metal na Zybo (Vitis)
 └── results/
     └── sweep.md            dokładność a szerokość cech i głębokość drzewa
 ```
@@ -147,7 +148,10 @@ można było syntetyzować bez uruchamiania Pythona.
 
 - AMD Vivado i Vitis HLS (wersje 2020.2–2024.x; licencja bezpłatna obejmuje Zynq-7020)
 - Python 3.8+ z pakietami `numpy` i `scikit-learn`
-- (opcjonalnie) płytka PYNQ-Z2 lub inna z układem `xc7z020clg400-1` z obrazem PYNQ
+- płytka Digilent Zybo Z7-20 (lub Z7-10 / Zybo) oraz pliki płytek Digilent dla Vivado
+  ([Digilent/vivado-boards](https://github.com/Digilent/vivado-boards): zawartość katalogu
+  `new/board_files` należy skopiować do `<Vivado>/data/boards/board_files`)
+- terminal szeregowy (np. PuTTY, Tera Term) do odczytu wyników z UART
 
 ## Uruchomienie
 
@@ -176,7 +180,7 @@ vitis-run --mode hls --tcl run_hls.tcl      # Vitis 2024.1 i nowsze
 ```
 
 Zmienne środowiskowe: `VARIANTS="v0 v1"` ogranicza listę wariantów, `COSIM=0` pomija
-kosymulację. Po syntezie:
+kosymulację, `PART=xc7z010clg400-1` wybiera układ Zybo Z7-10 / Zybo. Po syntezie:
 
 ```bash
 cd .. && python3 python/hls_report.py       # results/hls_results.md
@@ -196,24 +200,44 @@ AP_INCLUDE=<ścieżka>/Vitis_HLS/<wersja>/include hls/run_csim.sh
 
 ```bash
 cd vivado
-vivado -mode batch -source build_bd.tcl -tclargs v1
+vivado -mode batch -source build_bd.tcl -tclargs v1                # Zybo Z7-20
+vivado -mode batch -source build_bd.tcl -tclargs v1 zybo-z7-10     # Zybo Z7-10
 ```
 
-Wynik: `vivado/out/dt_v1.bit`, `dt_v1.hwh` oraz raporty zasobów i taktowania po implementacji.
-Równoważnie w GUI: ZYNQ7 Processing System → Run Block Automation → dodanie IP z HLS →
-Run Connection Automation → Create HDL Wrapper → Generate Bitstream.
+Skrypt tworzy projekt blokowy (Zynq PS z ustawieniami płytki + IP z HLS na `M_AXI_GP0`),
+generuje bitstream i zapisuje platformę sprzętową `vivado/out/dt_v1.xsa` (z bitstreamem)
+oraz raporty zasobów i taktowania po implementacji. Równoważnie w GUI: projekt z płytką Zybo →
+ZYNQ7 Processing System → Run Block Automation → dodanie IP z HLS → Run Connection Automation →
+Create HDL Wrapper → Generate Bitstream → File › Export › Export Hardware (Include bitstream).
 
-### 4. Płytka PYNQ
+### 4. Program na Zybo (Vitis, bare-metal)
 
-Do jednego katalogu na płytce należy skopiować `dt_<v>.bit`, `dt_<v>.hwh`,
-`gen/b12/test_data.npz` (dla v3: `gen/b8/test_data.npz`) oraz `pynq/dt_host.py`:
+1. W Vitis utworzyć platformę z pliku `dt_v1.xsa` (system operacyjny *standalone*,
+   procesor `ps7_cortexa9_0`) i zbudować ją.
+2. Utworzyć aplikację z szablonu *Empty Application (C)* dla tej platformy.
+3. Do katalogu `src` aplikacji skopiować `zybo/dt_host.c` oraz `gen/b12/model.h`
+   i `gen/b12/test_data.h` (dla v3: pliki z `gen/b8`).
+4. Ustawić wariant w `dt_host.c` (`DT_VARIANT`: 0, 1 lub 2 dla v2/v3) i zbudować aplikację.
+5. Podłączyć płytkę przez micro-USB (zworka bootowania w pozycji JTAG), otworzyć terminal
+   szeregowy 115200 8N1 i uruchomić aplikację (Run As › Launch Hardware). Vitis wgrywa
+   bitstream i program.
 
-```bash
-sudo python3 dt_host.py v1
+   W Vitis 2023.2 i nowszych (nowe IDE) odpowiednikami są *Platform Component*
+   i *Application Component*, a aplikację uruchamia się przyciskiem *Run*.
+
+Przykładowy wynik:
+
+```
+=== ESL temat 14: wariant 1, cechy 12-bitowe, 171 probek ===
+Niezgodnosci HW vs Python: 0
+Dokladnosc HW: 159/171 (92.9%)
+Czas na probke: HW (z transferem AXI-Lite) ... ns, SW drzewo na ARM ... ns
+TEST OK
 ```
 
-Program raportuje liczbę niezgodności z Pythonem, dokładność oraz średni czas klasyfikacji
-jednej próbki w układzie (z transferem AXI4-Lite) i na procesorze ARM.
+Adres bazowy IP jest odczytywany z `xparameters.h`, a przesunięcia rejestrów z nagłówka
+sterownika wygenerowanego przez HLS (`x<funkcja>_hw.h`); w razie ich braku program używa
+wartości domyślnych (`0x43C00000`, `ap_return` = `0x10`, argument = `0x18`).
 
 ## Harmonogram i podział pracy
 

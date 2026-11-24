@@ -6,10 +6,12 @@
 # Jeden wariant:  VARIANTS="v1" vitis_hls -f run_hls.tcl
 # Bez kosymulacji (szybciej): COSIM=0 vitis_hls -f run_hls.tcl
 #
-# Płytka: Zynq-7020 (PYNQ-Z2 / Zybo Z7-20), zegar 100 MHz.
+# Płytka: Zybo Z7-20 (xc7z020clg400-1), zegar 100 MHz.
+# Zybo Z7-10 i stare Zybo mają układ xc7z010clg400-1:  PART=xc7z010clg400-1 vitis_hls -f run_hls.tcl
 
 set here [file normalize [file dirname [info script]]]
 set part  "xc7z020clg400-1"
+if {[info exists ::env(PART)]} { set part $::env(PART) }
 set clock 10
 
 set variants {v0 v1 v2 v3}

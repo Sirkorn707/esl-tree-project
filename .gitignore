@@ -1,0 +1,22 @@
+# Projekty generowane przez Vitis HLS i Vivado (duże, odtwarzalne skryptami)
+hls/proj_*/
+hls/build/
+vivado/vivado_*/
+vivado/.Xil/
+*.jou
+*.log
+*.str
+.Xil/
+
+# Bitstreamy - wrzucać tylko świadomie (np. w Releases)
+vivado/out/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# System
+.DS_Store
+Thumbs.db

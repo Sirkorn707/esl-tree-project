@@ -227,5 +227,5 @@ jednej próbki w układzie (z transferem AXI4-Lite) i na procesorze ARM.
 
 | osoba | zakres |
 |---|---|
-| [Imię Nazwisko] | model i weryfikacja: trening i eksport, testbench, analiza dokładności, program hosta i pomiary na płytce |
-| [Imię Nazwisko] | sprzęt: jądra HLS, dyrektywy, synteza i kosymulacja, projekt w Vivado, analiza zasobów |
+| KO | model i weryfikacja: trening i eksport, testbench, analiza dokładności, program hosta i pomiary na płytce |
+| RM | sprzęt: jądra HLS, dyrektywy, synteza i kosymulacja, projekt w Vivado, analiza zasobów |

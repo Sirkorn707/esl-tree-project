@@ -4,8 +4,6 @@ Sprzętowy akcelerator klasyfikatora drzewiastego dla układu Zynq-7020, zaproje
 w Vitis HLS. Projekt realizowany w ramach przedmiotu **Programowanie wysokopoziomowe
 układów (ESL)**, temat 14: *Drzewo decyzyjne i las losowy w sprzęcie*, rok akademicki 2026/2027.
 
-**Autorzy:** [Imię Nazwisko], [Imię Nazwisko]
-
 ---
 
 ## Spis treści
